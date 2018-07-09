@@ -145,9 +145,6 @@ MemBuffer::MemBuffer(int size)
 
 MemBuffer::~MemBuffer()
 {
-	if (!m_size)
-		// Function assumed not to throw an exception but does...
-		throw LIMA_COM_EXC(Error, "Deleting empty buffer");
 	release();
 }
 
