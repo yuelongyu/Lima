@@ -47,11 +47,17 @@ class LIMACORE_API MemBuffer
 
 	MemBuffer();
 	MemBuffer(int size);
-	MemBuffer(const MemBuffer& buffer);
 	~MemBuffer();
 
-	void alloc(int size);
-	void copy(const MemBuffer& buffer);
+	MemBuffer(const MemBuffer&);
+	MemBuffer& operator=(const MemBuffer&);
+
+	// MemBuffer are move-constructible or move-assignable.
+	MemBuffer(MemBuffer&&) = default;
+	MemBuffer& operator=(MemBuffer&&) = default;
+
+	void alloc(int& size);
+	void deepCopy(const MemBuffer& buffer);
 	void release();
 
 	int getSize() const;
@@ -63,9 +69,10 @@ class LIMACORE_API MemBuffer
 	operator void*();
 	operator const void*() const;
 
-	MemBuffer& operator =(const MemBuffer& buffer);
-
  private:
+	static bool useMmap(int size);
+	static int getPageAlignedSize(int size);
+
 	int m_size;
 	void *m_ptr;
 };
@@ -95,6 +102,10 @@ inline MemBuffer::operator const void *() const
 	return getConstPtr();
 }
 
+inline bool MemBuffer::useMmap(int size)
+{
+	return size >= 128 * 1024;
+}
 
 
 } // namespace lima
