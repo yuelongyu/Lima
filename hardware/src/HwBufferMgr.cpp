@@ -62,6 +62,10 @@ void BufferAllocMgr::clearAllBuffers()
 SoftBufferAllocMgr::SoftBufferAllocMgr()
 {
 	DEB_CONSTRUCTOR();
+
+#ifdef LIMA_USE_NUMA
+	m_cpu_mask = 0;
+#endif
 }
 
 SoftBufferAllocMgr::~SoftBufferAllocMgr()
@@ -74,6 +78,22 @@ int SoftBufferAllocMgr::getMaxNbBuffers(const FrameDim& frame_dim)
 {
 	return GetDefMaxNbBuffers(frame_dim);
 }
+
+#ifdef LIMA_USE_NUMA
+void SoftBufferAllocMgr::setCPUAffinityMask(unsigned long cpu_mask)
+{
+	DEB_MEMBER_FUNCT();
+	DEB_PARAM() << DEB_VAR1(DEB_HEX(cpu_mask));
+	m_cpu_mask = cpu_mask;
+}
+
+void SoftBufferAllocMgr::getCPUAffinityMask(unsigned long& cpu_mask)
+{
+	DEB_MEMBER_FUNCT();
+	cpu_mask = m_cpu_mask;
+	DEB_RETURN() << DEB_VAR1(DEB_HEX(cpu_mask));
+}
+#endif
 
 void SoftBufferAllocMgr::allocBuffers(int nb_buffers,
 				      const FrameDim& frame_dim)
@@ -105,18 +125,17 @@ void SoftBufferAllocMgr::allocBuffers(int nb_buffers,
 	try {
 		BufferList& bl = m_buffer_list;
 		if (to_alloc > 0) {
-			bl.reserve(nb_buffers);
+			bl.resize(nb_buffers);
 			DEB_TRACE() << "Allocating " << to_alloc << " buffers";
-			while (int(bl.size()) != nb_buffers) {
-				MemBuffer *buffer = new MemBuffer(frame_size);
-				bl.push_back(buffer);
+			for (int i = 0; i < nb_buffers; i++) {
+#ifdef LIMA_USE_NUMA
+				if (m_cpu_mask)
+					bl[i].setCPUAffinityMask(m_cpu_mask);
+#endif
+				bl[i].alloc(frame_size);
 			}
 		} else {
 			DEB_TRACE() << "Releasing " << -to_alloc << " buffers";
-			while (int(bl.size()) != nb_buffers) {
-				delete bl.back();
-				bl.pop_back();
-			}
 		}
 	} catch (...) {
 		DEB_ERROR() << "Error alloc. buffer #" << m_buffer_list.size();
@@ -132,8 +151,6 @@ void SoftBufferAllocMgr::releaseBuffers()
 	DEB_MEMBER_FUNCT();
 
 	BufferList& bl = m_buffer_list;
-	for (BufferListCRIt it = bl.rbegin(); it != bl.rend(); ++it)
-		delete *it;
 	bl.clear();
 	m_frame_dim = FrameDim();
 }
@@ -155,7 +172,7 @@ void SoftBufferAllocMgr::getNbBuffers(int& nb_buffers)
 void *SoftBufferAllocMgr::getBufferPtr(int buffer_nb)
 {
 	DEB_MEMBER_FUNCT();
-	void *ptr = m_buffer_list[buffer_nb]->getPtr();
+	void *ptr = m_buffer_list[buffer_nb].getPtr();
 	DEB_RETURN() << DEB_VAR1(ptr);
 	return ptr;
 }
@@ -755,6 +772,18 @@ void SoftBufferCtrlObj::unregisterFrameCallback(HwFrameCallback& frame_cb)
 {
 	m_mgr.unregisterFrameCallback(frame_cb);
 }
+
+#ifdef LIMA_USE_NUMA
+void SoftBufferCtrlObj::setCPUAffinityMask(unsigned long cpu_mask)
+{
+	m_buffer_alloc_mgr.setCPUAffinityMask(cpu_mask);
+}
+
+void SoftBufferCtrlObj::getCPUAffinityMask(unsigned long& cpu_mask)
+{
+	m_buffer_alloc_mgr.getCPUAffinityMask(cpu_mask);
+}
+#endif
 
 StdBufferCbMgr& SoftBufferCtrlObj::getBuffer() 
 {

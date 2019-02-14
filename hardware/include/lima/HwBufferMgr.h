@@ -48,6 +48,10 @@ class LIMACORE_API BufferAllocMgr
 	BufferAllocMgr();
 	virtual ~BufferAllocMgr();
 
+	// BufferAllocMgr are **not** copy-constructible nor copy-assignable.
+	BufferAllocMgr(const BufferAllocMgr&) = delete;
+	BufferAllocMgr& operator=(const BufferAllocMgr&) = delete;
+
 	virtual int getMaxNbBuffers(const FrameDim& frame_dim) = 0;
 	virtual void allocBuffers(int nb_buffers, 
 				  const FrameDim& frame_dim) = 0;
@@ -85,13 +89,22 @@ class LIMACORE_API SoftBufferAllocMgr : public BufferAllocMgr
 	virtual void releaseBuffers();
 
 	virtual void *getBufferPtr(int buffer_nb);
+
+#ifdef LIMA_USE_NUMA
+	void setCPUAffinityMask(unsigned long  cpu_mask);
+	void getCPUAffinityMask(unsigned long& cpu_mask);
+#endif
 	
  private:
-	typedef std::vector<MemBuffer *> BufferList;
+	typedef std::vector<MemBuffer> BufferList;
 	typedef BufferList::const_reverse_iterator BufferListCRIt;
 
 	FrameDim m_frame_dim;
 	BufferList m_buffer_list;
+
+#ifdef LIMA_USE_NUMA
+	unsigned long m_cpu_mask;
+#endif
 };
 
 
@@ -300,6 +313,11 @@ class LIMACORE_API SoftBufferCtrlObj : public HwBufferCtrlObj
 
 	virtual void   registerFrameCallback(HwFrameCallback& frame_cb);
 	virtual void unregisterFrameCallback(HwFrameCallback& frame_cb);
+
+#ifdef LIMA_USE_NUMA
+	void setCPUAffinityMask(unsigned long  cpu_mask);
+	void getCPUAffinityMask(unsigned long& cpu_mask);
+#endif
 
 	StdBufferCbMgr&  getBuffer();
 
